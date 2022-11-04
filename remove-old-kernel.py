@@ -112,13 +112,13 @@ def main():
         logger.info("OK: No old kernels found to delete, keeping at least one old version")
         exit(0)
 
-    deletekernels = oldkernels.sort()[:-2]
+    deletekernels = sorted(oldkernels)[:-2]
     logger.warning(f"Delete kernels: {deletekernels}")
 
     for version in deletekernels:
         logger.debug("Deleting kernel {version}")
         if not DEBUG:
-            pass
+            logger.debug(f"rpm -qa | grep {version} | xargs yum remove -y --")
             #subprocess.run(f"rpm -qa | grep {version} | xargs yum remove -y --", shell=True, timeout=60, encoding="utf-8", check=True)
 
 
