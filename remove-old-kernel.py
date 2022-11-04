@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Requires Python >= 3.6
 import argparse
 import logging
 import os
@@ -10,6 +11,11 @@ import sys
 
 
 DEBUG = False
+
+# Check for minimum Python version
+if not sys.version_info > (3, 6):
+    print("ERROR: Requires Python 3.6 or higher")
+    exit(1)
 
 
 class LogFilter(logging.Filter):
@@ -51,6 +57,7 @@ def get_logger(debug: bool = False) -> logging.Logger:
 
 
 def get_freediskspace(partition: str) -> int:
+    '''Return free disk space of partition'''
     logger = logging.getLogger(__name__)
 
     total, used, free = shutil.disk_usage(partition)
@@ -63,6 +70,7 @@ def get_freediskspace(partition: str) -> int:
 
 
 def get_oldkernels() -> list:
+    '''Return a list of all kernel versions older than the current running kernel'''
     logger = logging.getLogger(__name__)
     allkernels = []
     oldkernels = []
@@ -78,48 +86,70 @@ def get_oldkernels() -> list:
     ts = rpm.TransactionSet()
     mi = ts.dbMatch()
     for package in mi:
-        if package["name"] == "kernel":
-            version = "%s-%s" % (package["version"], package["release"])
+        package_name = package["name"] if type(package["name"]) == str else package["name"].decode('utf-8')
+        package_version = package["version"] if type(package["version"]) == str else package["version"].decode("utf-8")
+        package_release = package["release"] if type(package["release"]) == str else package["release"].decode("utf-8")
+        if package_name == "kernel":
+            version = "{}-{}".format(package_version, package_release)
+            logger.debug(f"Found installed kernel {package_name}-{version}")
             allkernels.append(version)
 
     for version in sorted(allkernels):
+        logger.debug(f"Checking old kernel version {version} ...")
         m = re.match("([0-9\.-]+)\.el", version)
-        if m.groups()[0] != curkernel:
-            oldkernels.append(m.groups()[0])
+        if m:
+            if m.groups()[0] != curkernel:
+                oldkernels.append(m.groups()[0])
+            else:
+                break
         else:
-            break
+            logger.debug(f"Invalid version string found ({version})")
 
     return oldkernels
 
 
 def main():
+    ''' Main function'''
     global DEBUG
     deletekernels = []
 
+    # Parse commandline arguments
     args = parseargs()
     if args.debug:
         DEBUG = True
     logger = get_logger(args.debug)
 
+    # Check free diskspace
     free = get_freediskspace("/boot")
     if free > 100 and not DEBUG:
         logger.info(f"OK: Enough space on /boot ({free} MiB)")
         exit(0)
 
+    # Get a list of all old kernels
     oldkernels = get_oldkernels()
     logger.debug(f"Old kernels: {oldkernels}")
     if len(oldkernels) <= 1:
         logger.info("OK: No old kernels found to delete, keeping at least one old version")
         exit(0)
 
-    deletekernels = sorted(oldkernels)[:-2]
+    # Leave at least one old kernel for backup
+    logger.debug(f"Sorted old kernels: {sorted(oldkernels)}")
+    deletekernels = sorted(oldkernels)[:-1]
     logger.warning(f"Delete kernels: {deletekernels}")
 
+    # Remove all other old kernel packages
     for version in deletekernels:
-        logger.debug("Deleting kernel {version}")
+        logger.debug(f"Deleting kernel {version} ...")
         if not DEBUG:
-            logger.debug(f"rpm -qa | grep {version} | xargs yum remove -y --")
-            #subprocess.run(f"rpm -qa | grep {version} | xargs yum remove -y --", shell=True, timeout=60, encoding="utf-8", check=True)
+            try:
+                logger.debug(f"rpm -qa | grep {version} | xargs yum remove -y --")
+                #subprocess.run(f"rpm -qa | grep {version} | xargs yum remove -y --", shell=True, timeout=60, encoding="utf-8", check=True)
+            except FileNotFoundError as e:
+                logger.error("File not found ({e})")
+            except TimeoutExpired as e:
+                logger.error("Timeout expired ({e})")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Error deleting packages ({e})")
 
 
 if __name__ == "__main__":
