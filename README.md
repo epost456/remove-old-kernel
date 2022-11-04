@@ -4,9 +4,10 @@
 ![license](https://img.shields.io/github/license/groland11/do-restarting.svg)
 
 # remove-old-kernel
-Remove old kernel package from Red Hat Enterpise Linux 7+
-- Keep at least one old kernel
-- Only delete old kernel packages if disk space on /boot is low
+Remove old kernel packages from Red Hat Enterpise Linux 7+
+- Keeps at least one old kernel. Oldest kernel versions will be deleted first.
+- Only deletes old kernel packages if disk space on /boot is low.
+- Does not remove kernel packages in debug mode.
 
 ## Usage
 ```
