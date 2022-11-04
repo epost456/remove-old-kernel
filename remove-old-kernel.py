@@ -4,8 +4,9 @@ import logging
 import os
 import re
 import rpm
-import sys
 import shutil
+import subprocess
+import sys
 
 
 DEBUG = False
@@ -101,18 +102,24 @@ def main():
     logger = get_logger(args.debug)
 
     free = get_freediskspace("/boot")
-    if free > 100:
+    if free > 100 and not DEBUG:
         logger.info(f"OK: Enough space on /boot ({free} MiB)")
         exit(0)
 
     oldkernels = get_oldkernels()
-    print(f"Old kernels: {oldkernels}")
+    logger.debug(f"Old kernels: {oldkernels}")
     if len(oldkernels) <= 1:
-        logger.info("OK: No old kernels found")
+        logger.info("OK: No old kernels found to delete, keeping at least one old version")
         exit(0)
 
     deletekernels = oldkernels.sort()[:-2]
     logger.warning(f"Delete kernels: {deletekernels}")
+
+    for version in deletekernels:
+        logger.debug("Deleting kernel {version}")
+        if not DEBUG:
+            pass
+            #subprocess.run(f"rpm -qa | grep {version} | xargs yum remove -y --", shell=True, timeout=60, encoding="utf-8", check=True)
 
 
 if __name__ == "__main__":
