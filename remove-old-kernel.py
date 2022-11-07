@@ -13,7 +13,7 @@ import sys
 DEBUG = False
 
 # Check for minimum Python version
-if not sys.version_info > (3, 6):
+if not sys.version_info >= (3, 6):
     print("ERROR: Requires Python 3.6 or higher")
     exit(1)
 
