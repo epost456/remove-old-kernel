@@ -143,7 +143,7 @@ def main():
         if not DEBUG:
             try:
                 logger.debug(f"rpm -qa | grep {version} | xargs yum remove -y --")
-                #subprocess.run(f"rpm -qa | grep {version} | xargs yum remove -y --", shell=True, timeout=60, encoding="utf-8", check=True)
+                subprocess.run(f"rpm -qa | grep {version} | xargs yum remove -y --", shell=True, timeout=60, encoding="utf-8", check=True, stdout=subprocess.PIPE)
             except FileNotFoundError as e:
                 logger.error("File not found ({e})")
             except TimeoutExpired as e:
