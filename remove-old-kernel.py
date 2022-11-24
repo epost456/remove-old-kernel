@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+from packaging import version
 import re
 import rpm
 import shutil
@@ -54,6 +55,24 @@ def get_logger(debug: bool = False) -> logging.Logger:
     logger.addHandler(h2)
 
     return logger
+
+
+def version_sorted(versions: list) -> list:
+    '''Sort kernel versions in ascending order'''
+
+    # Replace hyphens with dots to make kernel version sortable
+    versions2 = [v.replace('-', '.') for v in versions]
+
+    # Sort 5 dotted kernel version number
+    versions_sorted = sorted(versions2, key=lambda x: version.Version(x))
+
+    # Revert back to old hyphen values, but keep new sort order
+    for index, vs in enumerate(versions_sorted):
+        for v in versions:
+            if re.match(vs, v):
+                versions_sorted[index] = v
+
+    return versions_sorted
 
 
 def get_freediskspace(partition: str) -> int:
@@ -133,8 +152,8 @@ def main():
         exit(0)
 
     # Leave at least one old kernel for backup
-    logger.debug(f"Sorted old kernels: {sorted(oldkernels)}")
-    deletekernels = sorted(oldkernels)[:-1]
+    logger.debug(f"Sorted old kernels: {version_sorted(oldkernels)}")
+    deletekernels = version_sorted(oldkernels)[:-1]
     logger.warning(f"Delete kernels: {deletekernels}")
 
     # Remove all other old kernel packages
