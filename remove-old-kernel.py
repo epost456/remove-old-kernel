@@ -3,9 +3,7 @@
 import argparse
 import logging
 import os
-from packaging import version
 import re
-import rpm
 import shutil
 import subprocess
 import sys
@@ -64,7 +62,7 @@ def version_sorted(versions: list) -> list:
     versions2 = [v.replace('-', '.') for v in versions]
 
     # Sort 5 dotted kernel version number
-    versions_sorted = sorted(versions2, key=lambda x: version.Version(x))
+    versions_sorted = sorted(versions2, key=lambda x: [int(y) for y in x.split('.')])
 
     # Revert back to old hyphen values, but keep new sort order
     for index, vs in enumerate(versions_sorted):
@@ -102,20 +100,30 @@ def get_oldkernels() -> list:
     curkernel = m.groups()[0]
     logger.debug(f"Current kernel: {curkernel}")
 
-    ts = rpm.TransactionSet()
-    mi = ts.dbMatch()
-    for package in mi:
-        package_name = package["name"] if type(package["name"]) == str else package["name"].decode('utf-8')
-        package_version = package["version"] if type(package["version"]) == str else package["version"].decode("utf-8")
-        package_release = package["release"] if type(package["release"]) == str else package["release"].decode("utf-8")
-        if package_name == "kernel":
-            version = "{}-{}".format(package_version, package_release)
-            logger.debug(f"Found installed kernel {package_name}-{version}")
-            allkernels.append(version)
+    # Get all installed kernels
+    cmd = '/bin/rpm -qa name="kernel" --qf "%{NAME};%{VERSION};%{RELEASE}\n"'
+    try:
+        output = subprocess.run(cmd, timeout=60, encoding="utf-8", check=True, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as e:
+        logger.error(f"Failed to query RPM database: rpm command not found ({e})")
+    except subprocess.TimeoutExpired as e:
+        logger.error(f"Failed to query RPM database: rpm command timeout expired ({e})")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to query RPM database: rpm command returned: {e}")
+    else:
+        logger.debug(f"rpm command executed successfully ({cmd})")
 
-    for version in sorted(allkernels):
+        for line in output.stdout.splitlines():
+            package_name, package_version, package_release = line.split(";", 2)
+            package_release = package_release[:package_release.find(".el")]
+            if package_name == "kernel":
+                version = "{}-{}".format(package_version, package_release)
+                logger.debug(f"Found installed kernel {package_name}-{version}")
+                allkernels.append(version)
+
+    for version in allkernels:
         logger.debug(f"Checking old kernel version {version} ...")
-        m = re.match("([0-9\.-]+)\.el", version)
+        m = re.match("([0-9\.-]+)", version)
         if m:
             if m.groups()[0] != curkernel:
                 oldkernels.append(m.groups()[0])
