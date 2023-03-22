@@ -127,8 +127,6 @@ def get_oldkernels() -> list:
         if m:
             if m.groups()[0] != curkernel:
                 oldkernels.append(m.groups()[0])
-            else:
-                break
         else:
             logger.debug(f"Invalid version string found ({version})")
 
